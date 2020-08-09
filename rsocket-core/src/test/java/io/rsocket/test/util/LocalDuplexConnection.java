@@ -19,7 +19,7 @@ package io.rsocket.test.util;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.rsocket.DuplexConnection;
-import org.reactivestreams.Publisher;
+import io.rsocket.RSocketErrorException;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.DirectProcessor;
@@ -48,12 +48,16 @@ public class LocalDuplexConnection implements DuplexConnection {
   }
 
   @Override
-  public Mono<Void> send(Publisher<ByteBuf> frame) {
-    return Flux.from(frame)
-        .doOnNext(f -> System.out.println(name + " - " + f.toString()))
-        .doOnNext(send::onNext)
-        .doOnError(send::onError)
-        .then();
+  public void sendFrame(int streamId, ByteBuf frame, boolean prioritize) {
+    System.out.println(name + " - " + frame.toString());
+    send.onNext(frame);
+  }
+
+  @Override
+  public void terminate(ByteBuf frame, RSocketErrorException terminalError) {
+    System.out.println(name + " - " + frame.toString());
+    send.onNext(frame);
+    onClose.onError(terminalError);
   }
 
   @Override

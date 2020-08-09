@@ -605,8 +605,10 @@ public class RSocketConnector {
                                   .resumeToken(resumeToken);
                           keepAliveHandler =
                               new KeepAliveHandler.ResumableKeepAliveHandler(
-                                  session.resumableConnection());
-                          wrappedConnection = session.resumableConnection();
+                                  /*session.resumableConnection()*/ null);
+                          //                          wrappedConnection =
+                          // session.resumableConnection();
+                          wrappedConnection = null;
                         } else {
                           resumeToken = Unpooled.EMPTY_BUFFER;
                           keepAliveHandler =
@@ -662,7 +664,7 @@ public class RSocketConnector {
                         return interceptors
                             .initSocketAcceptor(acceptor)
                             .accept(setup, wrappedRSocketRequester)
-                            .flatMap(
+                            .map(
                                 rSocketHandler -> {
                                   RSocket wrappedRSocketHandler =
                                       interceptors.initResponder(rSocketHandler);
@@ -686,9 +688,9 @@ public class RSocketConnector {
                                           maxFrameLength,
                                           maxInboundPayloadSize);
 
-                                  return wrappedConnection
-                                      .sendOne(setupFrame.retain())
-                                      .thenReturn(wrappedRSocketRequester);
+                                  wrappedConnection.sendFrame(0, setupFrame.retain(), false);
+
+                                  return wrappedRSocketRequester;
                                 })
                             .doFinally(signalType -> setup.release());
                       });

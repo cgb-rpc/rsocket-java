@@ -19,9 +19,9 @@ package io.rsocket.transport.local;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.rsocket.DuplexConnection;
+import io.rsocket.RSocketErrorException;
+import io.rsocket.internal.UnboundedProcessor;
 import java.util.Objects;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
@@ -38,7 +38,7 @@ final class LocalDuplexConnection implements DuplexConnection {
 
   private final MonoProcessor<Void> onClose;
 
-  private final Subscriber<ByteBuf> out;
+  private final UnboundedProcessor<ByteBuf> out;
 
   /**
    * Creates a new instance.
@@ -51,7 +51,7 @@ final class LocalDuplexConnection implements DuplexConnection {
   LocalDuplexConnection(
       ByteBufAllocator allocator,
       Flux<ByteBuf> in,
-      Subscriber<ByteBuf> out,
+      UnboundedProcessor<ByteBuf> out,
       MonoProcessor<Void> onClose) {
     this.allocator = Objects.requireNonNull(allocator, "allocator must not be null");
     this.in = Objects.requireNonNull(in, "in must not be null");
@@ -82,17 +82,17 @@ final class LocalDuplexConnection implements DuplexConnection {
   }
 
   @Override
-  public Mono<Void> send(Publisher<ByteBuf> frames) {
-    Objects.requireNonNull(frames, "frames must not be null");
-
-    return Flux.from(frames).doOnNext(out::onNext).then();
+  public void sendFrame(int streamId, ByteBuf frame, boolean prioritize) {
+    if (prioritize) {
+      out.onNextPrioritized(frame);
+    } else {
+      out.onNext(frame);
+    }
   }
 
   @Override
-  public Mono<Void> sendOne(ByteBuf frame) {
-    Objects.requireNonNull(frame, "frame must not be null");
+  public void terminate(ByteBuf frame, RSocketErrorException e) {
     out.onNext(frame);
-    return Mono.empty();
   }
 
   @Override
