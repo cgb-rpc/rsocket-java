@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBuf;
 import io.rsocket.DuplexConnection;
 import io.rsocket.RSocketErrorException;
 import io.rsocket.buffer.LeaksTrackingByteBufAllocator;
+import io.rsocket.frame.ErrorFrameCodec;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.reactivestreams.Publisher;
@@ -65,7 +66,7 @@ public class TestDuplexConnection implements DuplexConnection {
   }
 
   @Override
-  public void sendFrame(int streamId, ByteBuf frame, boolean prioritize) {
+  public void sendFrame(int streamId, ByteBuf frame) {
     if (availability <= 0) {
       throw new IllegalStateException("RSocket not available. Availability: " + availability);
     }
@@ -104,10 +105,17 @@ public class TestDuplexConnection implements DuplexConnection {
   }
 
   @Override
-  public void terminate(ByteBuf frame, RSocketErrorException terminalError) {
-    sendSink.next(frame);
-    sent.offer(frame);
-    onClose.onError(terminalError);
+  public void sendErrorAndClose(RSocketErrorException e) {
+    final ByteBuf errorFrame = ErrorFrameCodec.encode(allocator, 0, e);
+    sendSink.next(errorFrame);
+    sent.offer(errorFrame);
+
+    final Throwable cause = e.getCause();
+    if (cause == null) {
+      onClose.onComplete();
+    } else {
+      onClose.onError(cause);
+    }
   }
 
   @Override
